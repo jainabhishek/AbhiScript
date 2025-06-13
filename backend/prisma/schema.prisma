@@ -1,0 +1,86 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Users table (for basic auth if needed)
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  recordings Recording[]
+
+  @@map("users")
+}
+
+// Call recordings metadata
+model Recording {
+  id               String            @id @default(cuid())
+  userId           String?           @map("user_id")
+  filename         String
+  originalFilename String            @map("original_filename")
+  fileSize         Int               @map("file_size")
+  duration         Float?            // Duration in seconds
+  filePath         String            @map("file_path")
+  status           String            @default("UPLOADING")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  user        User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  transcript  Transcript?
+  aiInsights  AiInsight[]
+
+  @@map("recordings")
+}
+
+// Transcripts
+model Transcript {
+  id              String   @id @default(cuid())
+  recordingId     String   @unique @map("recording_id")
+  content         String   // JSON with speaker segments
+  rawTranscript   String   @map("raw_transcript")
+  speakerCount    Int      @map("speaker_count")
+  confidenceScore Float?   @map("confidence_score")
+  language        String?
+  speakerNames    String?  @map("speaker_names") // JSON mapping of speaker labels to names
+  speakerIdentified Boolean @default(false) @map("speaker_identified")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  recording Recording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+
+  @@map("transcripts")
+}
+
+// AI-generated content
+model AiInsight {
+  id          String      @id @default(cuid())
+  recordingId String      @map("recording_id")
+  insightType String      @map("insight_type")
+  content     String      // JSON content
+  promptUsed  String?     @map("prompt_used")
+  model       String?     // AI model used
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  recording Recording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+
+  @@map("ai_insights")
+}
+
+// Note: SQLite doesn't support enums, so we use string fields with predefined values
+// RecordingStatus values: "UPLOADING", "PROCESSING", "TRANSCRIBING", "DIARIZING", "ANALYZING", "COMPLETED", "FAILED"
+// InsightType values: "SUMMARY", "ACTION_ITEMS", "SENTIMENT", "TOPICS", "CUSTOM"
